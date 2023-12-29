@@ -1,0 +1,19 @@
+{
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MariaDB",
+            "name": "connect",
+            "database": "bw",
+            "username": "root",
+            "askForPassword": true
+        }
+    ]
+}

@@ -1,0 +1,26 @@
+[package]
+name = "birthday-wisher"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4.31"
+inquire = { version = "0.6.2", features = ["date"] }
+serde = "1.0.193"
+serde_json = "1.0.108"
+serde_repr = "0.1"
+tabled = "0.15.0"
+uuid = { version = "1.6.1", features = ["v4"] }
+sqlx = { version = "0.7.3", features = [
+  "runtime-tokio-native-tls",
+  "postgres",
+  "macros",
+  "chrono",
+] }
+dotenvy = "0.15"
+tokio = { version = "1", features = ["full"] }
+regex = "1.10.2"
+lettre = {version = "0.11.2",  features = ["native-tls"]}
+clap = { version = "4.4.11", features = ["derive"] }
