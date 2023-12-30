@@ -1,10 +1,16 @@
+use std::env;
 use std::io::{self, Write};
 
 use chrono::NaiveDate;
 use inquire::validator::Validation;
 use inquire::{formatter::DEFAULT_DATE_FORMATTER, CustomType};
 use inquire::{min_length, Text};
+use lettre::Transport;
 use regex::Regex;
+use lettre::{
+    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
+    SmtpTransport,
+};
 
 
 use crate::schema::InputTypes;
@@ -78,6 +84,36 @@ fn val(value: &str) -> Result<Validation, Box<dyn std::error::Error + Send + Syn
         },
     }
 }
+
+pub async fn send_email(to: String, subject: String, body: String) {
+    let smtp_username =
+        env::var("SMTP_USERNAME").expect("Please set up SMTP_USERNAME in your environment");
+    let from_email = format!("Rahul <{}>", smtp_username.as_str());
+    let smtp_password =
+        env::var("SMTP_PASSWORD").expect("Please set up SMTP_PASSWORD in your environment");
+    let smtp_host = env::var("SMTP_HOST").expect("Please set up SMTP_HOST in your environment");
+
+    let email = Message::builder()
+        .from(from_email.as_str().parse().unwrap())
+        .to(to.parse().unwrap())
+        .subject(subject)
+        .header(ContentType::TEXT_PLAIN)
+        .body(body)
+        .unwrap();
+
+    let creds = Credentials::new(smtp_username.to_owned(), smtp_password.to_owned());
+
+    let mailer = SmtpTransport::relay(smtp_host.as_str())
+        .unwrap()
+        .credentials(creds)
+        .build();
+
+    match mailer.send(&email) {
+        Ok(_) => println!("Email sent successfully!"),
+        Err(e) => panic!("Could not send email: {e:?}"),
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

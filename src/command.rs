@@ -11,14 +11,7 @@ pub struct Opts {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    #[command(arg_required_else_help = true)]
-    Send {
-        #[arg(short, long)]
-        to: String,
-        #[arg(short, long)]
-        subject: String,
-        #[arg(short, long)]
-        body: String,
-    },
+
+    Send,
     Run,
 }

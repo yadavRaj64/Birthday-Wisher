@@ -10,7 +10,7 @@ use tabled::{Table, Tabled};
 
 use sqlx::{Error, PgPool};
 
-use crate::db_connection::establish_connect;
+use crate::{db_connection::establish_connect, utils::send_email};
 use crate::utils::get_text_input;
 
 #[derive(Default, Tabled, Clone, Debug)]
@@ -48,6 +48,13 @@ impl Friend {
         .await;
         friend
     }
+
+    pub async fn send_birthday_email(&self){
+        let subject = format!("Happy Birthday {}!",self.name);
+        let body = format!("Happy Birthday {}!", self.name);
+        send_email((*self.email).to_string(), subject, body).await;
+    }
+
 }
 
 #[derive(Default, Tabled, Clone)]
@@ -73,16 +80,16 @@ impl NewFriend {
     }
 }
 
-#[derive(Clone)]
-pub struct Friends {
-    pub friends: Vec<Friend>,
-}
-
 pub enum InputTypes {
     Text,
     Date,
     Num,
     Email,
+}
+
+#[derive(Clone)]
+pub struct Friends {
+    pub friends: Vec<Friend>,
 }
 
 impl Friends {
@@ -181,6 +188,20 @@ impl Friends {
             }
             Err(_) => println!("Fail to get connection with Database!"),
         }
+    }
+
+    pub async fn get_list_of_birthday_friends()-> Result<Vec<Friend>,Error>{
+        let connect = establish_connect().await?;
+        let friends = sqlx::query_as!(
+            Friend,
+            r#"
+            SELECT * FROM friend
+            WHERE EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE)
+            AND EXTRACT(DAY FROM dob) = EXTRACT(DAY FROM CURRENT_DATE)
+            "#,
+        ).fetch_all(&connect)
+        .await;
+    friends
     }
 }
 
