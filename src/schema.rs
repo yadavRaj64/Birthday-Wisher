@@ -1,8 +1,9 @@
 use std::{
     fmt::{Display, Formatter},
-    str::FromStr,
+    str::FromStr
 };
 
+use askama::Template;
 use chrono::NaiveDate;
 use inquire::Confirm;
 
@@ -12,6 +13,11 @@ use sqlx::{Error, PgPool};
 
 use crate::{db_connection::establish_connect, utils::send_email};
 use crate::utils::get_text_input;
+#[derive(Template)]
+#[template(path= "index.html")]
+struct BirthdayTemp<'a> {
+    name: &'a str,
+}
 
 #[derive(Default, Tabled, Clone, Debug)]
 pub struct Friend {
@@ -51,8 +57,9 @@ impl Friend {
 
     pub async fn send_birthday_email(&self){
         let subject = format!("Happy Birthday {}!",self.name);
-        let body = format!("Happy Birthday {}!", self.name);
-        send_email((*self.email).to_string(), subject, body).await;
+        // let body = format!("Happy Birthday {}!", self.name);
+        let body = BirthdayTemp{name: &self.name};
+        send_email((*self.email).to_string(), subject, body.render().unwrap()).await;
     }
 
 }

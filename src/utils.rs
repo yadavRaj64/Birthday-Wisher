@@ -12,9 +12,7 @@ use lettre::{
     SmtpTransport,
 };
 
-
 use crate::schema::InputTypes;
-
 
 pub fn get_text_input(prompt: &str, input_type: InputTypes) -> Option<String> {
     match input_type {
@@ -97,7 +95,7 @@ pub async fn send_email(to: String, subject: String, body: String) {
         .from(from_email.as_str().parse().unwrap())
         .to(to.parse().unwrap())
         .subject(subject)
-        .header(ContentType::TEXT_PLAIN)
+        .header(ContentType::TEXT_HTML)
         .body(body)
         .unwrap();
 
