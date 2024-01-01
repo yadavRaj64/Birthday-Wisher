@@ -7,6 +7,7 @@ use askama::Template;
 use chrono::NaiveDate;
 use inquire::Confirm;
 
+use serde::{Serialize, Deserialize};
 use tabled::{Table, Tabled};
 
 use sqlx::{Error, PgPool};
@@ -19,7 +20,7 @@ struct BirthdayTemp<'a> {
     name: &'a str,
 }
 
-#[derive(Default, Tabled, Clone, Debug)]
+#[derive(Default, Tabled, Clone, Debug, Serialize)]
 pub struct Friend {
     id: i32,
     name: String,
@@ -29,14 +30,14 @@ pub struct Friend {
 
 impl Friend {
     // Used for getting details of a particular friend from database whose id is given
-    async fn get_friend(conn: &PgPool, id: i32) -> Result<Friend, Error> {
+    pub async fn get_friend(conn: &PgPool, id: i32) -> Result<Friend, Error> {
         sqlx::query_as!(Friend, "SELECT * FROM friend WHERE id = ($1)", id)
             .fetch_one(conn)
             .await
     }
 
     // Used for getting details of all friends from database
-    async fn get_friends(conn: &PgPool) -> Result<Vec<Friend>, Error> {
+    pub async fn get_friends(conn: &PgPool) -> Result<Vec<Friend>, Error> {
         let friends = sqlx::query_as!(Friend, "SELECT * FROM friend",)
             .fetch_all(conn)
             .await?;
@@ -44,7 +45,7 @@ impl Friend {
     }
 
     //
-    async fn remove_friend(self, conn: &PgPool) -> Result<Friend, Error> {
+    pub async fn remove_friend(self, conn: &PgPool) -> Result<Friend, Error> {
         let friend = sqlx::query_as!(
             Friend,
             "DELETE FROM friend WHERE id = ($1) RETURNING *",
@@ -64,7 +65,7 @@ impl Friend {
 
 }
 
-#[derive(Default, Tabled, Clone)]
+#[derive(Default, Tabled, Clone, Deserialize)]
 pub struct NewFriend {
     name: String,
     email: String,
@@ -72,7 +73,7 @@ pub struct NewFriend {
 }
 
 impl NewFriend {
-    async fn add(self, conn: &PgPool) -> Result<Friend, Error> {
+    pub async fn add(self, conn: &PgPool) -> Result<Friend, Error> {
         let result = sqlx::query_as!(
             Friend,
             "INSERT INTO friend (name, email, dob) VALUES($1, $2, $3) RETURNING *",

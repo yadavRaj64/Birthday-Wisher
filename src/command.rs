@@ -14,4 +14,5 @@ pub enum Command {
 
     Send,
     Run,
+    Serve,
 }
