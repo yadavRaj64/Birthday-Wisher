@@ -46,9 +46,6 @@ pub fn get_text_input(prompt: &str, input_type: InputTypes) -> Option<String> {
                 Err(_) => None             }
         },
         InputTypes::Email => {
-
-
-
             let ans = Text::new(prompt)
                 .with_validator(val)
                 .prompt();

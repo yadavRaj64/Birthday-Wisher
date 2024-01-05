@@ -15,5 +15,10 @@
             "username": "root",
             "askForPassword": true
         }
+    ],
+    "cSpell.words": [
+        "dotenv",
+        "dotenvy",
+        "sqlx"
     ]
 }

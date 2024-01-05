@@ -3,7 +3,7 @@ use serde::Serialize;
 use sqlx::{Pool, Postgres};
 use tower_http::trace::TraceLayer;
 
-use crate::{schema::{Friend, NewFriend}, db_connection::establish_connect};
+use crate::{schema::{Friend, NewFriend, FriendError}, db_connection::establish_connect};
 
 #[derive(Serialize)]
 struct Response{
@@ -39,7 +39,7 @@ async fn get_friend(Path(id): Path<i32>, State(pool): State<Pool<Postgres>>) -> 
     let friend = Friend::get_friend(&pool, id).await;
     match friend {
         Ok(friend) => Ok(Json(friend)),
-        Err(_) => Err((StatusCode::NOT_FOUND,Json(Response{status:StatusCode::NOT_FOUND.as_u16(),message:"Friend Not Found of Given Id".to_string()}))),
+        Err(_) => Err((StatusCode::NOT_FOUND,Json(Response{status:StatusCode::NOT_FOUND.as_u16(),message:"Friend Not Found with Given Id".to_string()}))),
     }
 }
 
@@ -53,7 +53,7 @@ async fn remove_friend(Path(id):Path<i32>, State(pool): State<Pool<Postgres>>) -
                 Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR,Json(Response{status:StatusCode::INTERNAL_SERVER_ERROR.as_u16(),message:"Something went wrong".to_string()}))),
             }
         }
-        Err(_) => Err((StatusCode::NOT_FOUND,Json(Response{status:StatusCode::NOT_FOUND.as_u16(),message:"Friend Not Found of Given Id".to_string()}))),
+        Err(_) => Err((StatusCode::NOT_FOUND,Json(Response{status:StatusCode::NOT_FOUND.as_u16(),message:"Friend Not Found with Given Id".to_string()}))),
     }
 }
 
@@ -61,7 +61,15 @@ async fn add_friend(State(pool): State<Pool<Postgres>>,Json(friend): Json<NewFri
     let result = friend.add(&pool).await;
     match result  {
         Ok(friend) => Ok(Json(friend)),
-        Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR,Json(Response{status:StatusCode::INTERNAL_SERVER_ERROR.as_u16(),message:"Something went wrong".to_string()}))),
+        Err(err) => {
+            match err {
+                FriendError::FriendAlreadyExist =>
+                Err((StatusCode::BAD_REQUEST,Json(Response{status:StatusCode::BAD_REQUEST.as_u16(),message:"Friend Already Exist with given email id".to_string()}))),
+
+                _ =>
+                Err((StatusCode::INTERNAL_SERVER_ERROR,Json(Response{status:StatusCode::INTERNAL_SERVER_ERROR.as_u16(),message:"Something went wrong".to_string()}))),
+            }
+        },
     }
 }
 

@@ -28,24 +28,42 @@ pub struct Friend {
     dob: NaiveDate,
 }
 
+// FriendError is enum type which is used to handle error
+pub enum FriendError {
+    FriendNotFound, // FriendNotFound is used when friend is not found in the database table
+                    // Ex: When we try to remove or get friend which is not in the list
+    FriendAlreadyExist, // FriendAlreadyExist is used when friend with provided email already exist in the database table
+    SqlxError(Error) // SqlxError is used when sqlx crate return error
+}
+
 impl Friend {
-    // Used for getting details of a particular friend from database whose id is given
-    pub async fn get_friend(conn: &PgPool, id: i32) -> Result<Friend, Error> {
-        sqlx::query_as!(Friend, "SELECT * FROM friend WHERE id = ($1)", id)
+    // get_friend is used to get friend from the database table
+    // It takes two argument
+    // 1. conn: &PgPool (Postgres connection) >> It is used to connect with database
+    // 2. id: i32 >> It is used to get friend with provided id 
+    pub async fn get_friend(conn: &PgPool, id: i32) -> Result<Friend, FriendError> {
+        let result = sqlx::query_as!(Friend, "SELECT * FROM friend WHERE id = ($1)", id)
             .fetch_one(conn)
-            .await
+            .await;
+        match result {
+            Ok(result) => Ok(result),
+            Err(err) => {
+                match err {
+                    Error::RowNotFound => Err(FriendError::FriendNotFound),
+                    _ => Err(FriendError::SqlxError(err)),
+                }
+            }
+        }
     }
 
-    // Used for getting details of all friends from database
     pub async fn get_friends(conn: &PgPool) -> Result<Vec<Friend>, Error> {
         let friends = sqlx::query_as!(Friend, "SELECT * FROM friend",)
             .fetch_all(conn)
-            .await?;
-        Ok(friends)
+            .await;
+        friends
     }
 
-    //
-    pub async fn remove_friend(self, conn: &PgPool) -> Result<Friend, Error> {
+    pub async fn remove_friend(self, conn: &PgPool) -> Result<Friend, FriendError> {
         let friend = sqlx::query_as!(
             Friend,
             "DELETE FROM friend WHERE id = ($1) RETURNING *",
@@ -53,7 +71,15 @@ impl Friend {
         )
         .fetch_one(conn)
         .await;
-        friend
+        match friend {
+            Ok(friend) => Ok(friend),
+            Err(err) => {
+                match err {
+                    Error::RowNotFound => Err(FriendError::FriendNotFound),
+                    _ => Err(FriendError::SqlxError(err)),
+                }
+            }
+        }
     }
 
     pub async fn send_birthday_email(&self){
@@ -61,6 +87,17 @@ impl Friend {
         // let body = format!("Happy Birthday {}!", self.name);
         let body = BirthdayTemp{name: &self.name};
         send_email((*self.email).to_string(), subject, body.render().unwrap()).await;
+    }
+
+    async fn get_friend_by_email(conn : &PgPool, email : &str) -> Result<Friend, Error>{
+        let result= sqlx::query_as!(
+            Friend,
+            "SELECT * FROM friend WHERE email = $1 ",
+            email
+        )
+        .fetch_one(conn)
+        .await;
+        result
     }
 
 }
@@ -73,18 +110,26 @@ pub struct NewFriend {
 }
 
 impl NewFriend {
-    pub async fn add(self, conn: &PgPool) -> Result<Friend, Error> {
+    pub async fn add(&self, conn: &PgPool) -> Result<Friend, FriendError> {
+        let friend = Friend::get_friend_by_email(&conn, &self.email).await;
+        if friend.is_ok() {
+            return Err(FriendError::FriendAlreadyExist);
+        }
+
         let result = sqlx::query_as!(
             Friend,
-            "INSERT INTO friend (name, email, dob) VALUES($1, $2, $3) RETURNING *",
+            "INSERT INTO friend (name, email, dob) VALUES($1, $2, $3)  RETURNING *",
             self.name,
             self.email,
             self.dob
         )
         .fetch_one(conn)
-        .await?;
+        .await;
 
-        Ok(result)
+        match result {
+            Ok(result) =>  Ok(result),
+            Err(err) => Err(FriendError::SqlxError(err))
+        }
     }
 }
 
@@ -138,10 +183,15 @@ impl Friends {
                     Ok(result) => {
                         println!("New friend is add to the list! \n {:?}", result);
                     }
-                    Err(_) => println!("Fail to add new friend!"),
+                    Err(err) => {
+                        match err {
+                            FriendError::FriendAlreadyExist => println!("Friend Already exist with this email id {}", friend.email),
+                            _=> println!("Something went wrong!"),
+                        }
+                    },
                 }
             }
-            Err(_) => println!("Something went wrong! "),
+            Err(err) => eprintln!("{:?}", err),
         }
         // self.friends.push(friend)
     }
@@ -174,10 +224,15 @@ impl Friends {
                             Err(_) => println!("Something went wrong!"),
                         }
                     }
-                    Err(_) => println!("Friend not found!"),
+                    Err(err) =>{
+                        match err  {
+                            FriendError::FriendNotFound => println!("Friend Not found!"),
+                            _ => println!("Something went wrong!")
+                        }
+                    },
                 }
             }
-            Err(_) => println!("Something went wrong!"),
+            Err(err) => eprintln!("{:?}", err),
         }
     }
 
@@ -194,7 +249,7 @@ impl Friends {
                     Err(_) => println!("Something went wrong, Please try again!"),
                 }
             }
-            Err(_) => println!("Fail to get connection with Database!"),
+            Err(err) => eprintln!("{:?}",err),
         }
     }
 
