@@ -1,12 +1,11 @@
-mod command;
-mod db_connection;
+mod cli;
+mod helper;
 mod runner;
 mod schema;
-mod utils;
 mod server;
 
 use clap::Parser;
-use command::{Command, Opts};
+use cli::command::{Command, Opts};
 use dotenvy::dotenv;
 use runner::send;
 use runner::start;

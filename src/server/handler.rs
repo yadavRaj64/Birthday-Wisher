@@ -4,10 +4,16 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use axum_extra::extract::WithRejection;
+
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 
-use crate::schema::{Friend, FriendError, NewFriend};
+use crate::schema::{
+    api::{EnteredOtp, LoginUser, NewUser}, friend::{Friend, NewFriend}, otps::Otp, user::User
+};
+
+use super::error::{ApiError, FriendError, UserError};
 
 #[derive(Serialize)]
 struct Response {
@@ -15,11 +21,88 @@ struct Response {
     message: String,
 }
 
-pub async fn signup(State(_pool): State<Pool<Postgres>>) -> impl IntoResponse {
-    Json(Response {
-        status: StatusCode::OK.as_u16(),
-        message: "Test".to_string(),
-    })
+pub async fn signup(
+    State(pool): State<Pool<Postgres>>,
+    WithRejection(Json(user), _): WithRejection<Json<NewUser>, ApiError>,
+) -> impl IntoResponse {
+    let result = User::get_user_by_email(&pool, &user.email).await;
+    match result {
+        Ok(_) => Err(ApiError::BadRequest(
+            "User Already Exist with given email id".to_string(),
+        )),
+        Err(err) => match err {
+            UserError::UserNotFound => {
+                let result = user.add(&pool).await;
+                match result {
+                    Ok(user) => {
+                        user.send_otp("Signup".to_string(),&pool).await?;
+                        Ok(Json(Response {
+                        status: StatusCode::OK.as_u16(),
+                        message: "User Created".to_string(),
+                    }))},
+                    Err(_) => Err(ApiError::InternalServerError),
+                }
+            }
+            _ => Err(ApiError::InternalServerError),
+        },
+    }
+}
+
+pub async fn login(
+    State(pool): State<Pool<Postgres>>,
+    WithRejection(Json(user), _): WithRejection<Json<LoginUser>, ApiError>,
+) -> impl IntoResponse {
+    let result = User::get_user_by_email(&pool, &user.email).await;
+    match result {
+        Ok(user) => {
+            user.send_otp("Login".to_string(), &pool).await?;
+            Ok(Json(Response {
+            status: StatusCode::OK.as_u16(),
+            message: "User Found".to_string(),
+        }))},
+        Err(err) => match err {
+            UserError::UserNotFound => Err(ApiError::NotFound(
+                "User Not Found with given email id".to_string(),
+            )),
+            _ => Err(ApiError::InternalServerError),
+        },
+    }
+}
+
+pub async fn verify_otp(
+    State(pool): State<Pool<Postgres>>,
+    WithRejection(Json(entered_otp), _): WithRejection<Json<EnteredOtp>, ApiError>,
+) -> impl IntoResponse {
+    let result = Otp::get_otp(entered_otp.email, &pool).await;
+    match result {
+        Ok(mut otp) =>  {
+            let result = otp.verify_otp(entered_otp.otp).await;
+            if result {
+                match otp.otp_used(&pool).await {
+                    Ok(_) => {
+                        Ok(Json(Response {
+                            status: StatusCode::OK.as_u16(),
+                            message: "OTP Verified".to_string(),
+                        }))
+                    },
+                    Err(_) => Err(ApiError::InternalServerError),
+                }
+            }
+            else{
+                return Err(ApiError::BadRequest(
+                    "Invalid OTP".to_string(),
+                ))
+            }
+        },
+        Err(err) =>{
+            match err {
+                sqlx::Error::RowNotFound => Err(ApiError::NotFound(
+                    "OTP Not Found with given email id".to_string(),
+                )),
+                _ => Err(ApiError::InternalServerError),
+            }
+        },
+    }
 }
 
 pub async fn show_friends(State(pool): State<Pool<Postgres>>) -> Json<Vec<Friend>> {

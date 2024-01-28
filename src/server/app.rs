@@ -4,8 +4,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::{
-    db_connection::establish_connect,
-    server::{friend_route::friend_route, handler::handler_404, public_route::public_route},
+    helper::db_connection::establish_connect, server::{friend_route::friend_route, handler::handler_404, public_route::public_route}
 };
 
 pub async fn serve() {
@@ -17,7 +16,7 @@ pub async fn serve() {
         .fallback(handler_404)
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
         .unwrap();
     info!("listening on http://{}", listener.local_addr().unwrap());

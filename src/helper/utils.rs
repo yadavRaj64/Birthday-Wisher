@@ -5,14 +5,15 @@ use chrono::NaiveDate;
 use inquire::validator::Validation;
 use inquire::{formatter::DEFAULT_DATE_FORMATTER, CustomType};
 use inquire::{min_length, Text};
+use lettre::transport::stub::Error;
 use lettre::Transport;
-use regex::Regex;
 use lettre::{
     message::header::ContentType, transport::smtp::authentication::Credentials, Message,
     SmtpTransport,
 };
+use regex::Regex;
 
-use crate::schema::InputTypes;
+use crate::schema::friend::InputTypes;
 
 pub fn get_text_input(prompt: &str, input_type: InputTypes) -> Option<String> {
     match input_type {
@@ -27,11 +28,11 @@ pub fn get_text_input(prompt: &str, input_type: InputTypes) -> Option<String> {
         }
         InputTypes::Date => {
             let date = CustomType::<NaiveDate>::new(prompt)
-        .with_placeholder("dd/mm/yyyy")
-        .with_parser(&|i| NaiveDate::parse_from_str(i, "%d/%m/%Y").map_err(|_e| ()))
-        .with_formatter(DEFAULT_DATE_FORMATTER)
-        .with_error_message("Please type a valid date.")
-        .prompt();
+                .with_placeholder("dd/mm/yyyy")
+                .with_parser(&|i| NaiveDate::parse_from_str(i, "%d/%m/%Y").map_err(|_e| ()))
+                .with_formatter(DEFAULT_DATE_FORMATTER)
+                .with_error_message("Please type a valid date.")
+                .prompt();
             match date {
                 Ok(value) => Some(value.to_string()),
                 Err(_) => None,
@@ -39,21 +40,19 @@ pub fn get_text_input(prompt: &str, input_type: InputTypes) -> Option<String> {
         }
         InputTypes::Num => {
             let ans = Text::new(prompt)
-            .with_validator(min_length!(1, "Minimum 1 letters are required"))
-            .prompt();
-            match ans {
-                Ok(value) => Some(value.to_string()),
-                Err(_) => None             }
-        },
-        InputTypes::Email => {
-            let ans = Text::new(prompt)
-                .with_validator(val)
+                .with_validator(min_length!(1, "Minimum 1 letters are required"))
                 .prompt();
             match ans {
-                Ok(value) =>Some(value),
+                Ok(value) => Some(value.to_string()),
                 Err(_) => None,
             }
-
+        }
+        InputTypes::Email => {
+            let ans = Text::new(prompt).with_validator(val).prompt();
+            match ans {
+                Ok(value) => Some(value),
+                Err(_) => None,
+            }
         }
     }
 }
@@ -68,19 +67,21 @@ fn val(value: &str) -> Result<Validation, Box<dyn std::error::Error + Send + Syn
     match reg {
         Ok(reg) => {
             if !reg.is_match(value) {
-                Ok(Validation::Invalid(format!("{} is not a valid email", value).as_str().into()))
+                Ok(Validation::Invalid(
+                    format!("{} is not a valid email", value).as_str().into(),
+                ))
             } else {
                 Ok(Validation::Valid)
             }
-        },
+        }
         Err(err) => {
-            println!("{:?}",err);
+            println!("{:?}", err);
             Ok(Validation::Invalid("Sorry Something went wrong".into()))
-        },
+        }
     }
 }
 
-pub async fn send_email(to: String, subject: String, body: String) {
+pub async fn send_email(to: &str, subject: String, body: String) -> Result<(), Error> {
     let smtp_username =
         env::var("SMTP_USERNAME").expect("Please set up SMTP_USERNAME in your environment");
     let from_email = format!("Rahul <{}>", smtp_username.as_str());
@@ -103,12 +104,9 @@ pub async fn send_email(to: String, subject: String, body: String) {
         .credentials(creds)
         .build();
 
-    match mailer.send(&email) {
-        Ok(_) => println!("Email sent successfully!"),
-        Err(e) => panic!("Could not send email: {e:?}"),
-    }
+    mailer.send(&email).unwrap();
+    Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -123,25 +121,20 @@ mod tests {
 
         let test1 = val(email1);
         match test1 {
-            Ok(result) => {
-                match result {
-                    Validation::Valid => assert!(false),
-                    Validation::Invalid(_) => assert!(true),
-                }
+            Ok(result) => match result {
+                Validation::Valid => assert!(false),
+                Validation::Invalid(_) => assert!(true),
             },
             Err(_) => assert!(false),
         }
 
-        let test2 =val(email2);
+        let test2 = val(email2);
         match test2 {
-            Ok(result) => {
-                match result{
+            Ok(result) => match result {
                 Validation::Valid => assert!(true),
-                    Validation::Invalid(_) => assert!(false),
-                }
-            }
+                Validation::Invalid(_) => assert!(false),
+            },
             Err(_) => assert!(false),
         }
     }
-
 }

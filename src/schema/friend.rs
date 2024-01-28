@@ -3,6 +3,8 @@ use std::{
     str::FromStr
 };
 
+use crate::{helper::{db_connection::establish_connect, utils::{get_text_input, send_email}}, server::error::FriendError};
+
 use askama::Template;
 use chrono::NaiveDate;
 use inquire::Confirm;
@@ -12,13 +14,13 @@ use tabled::{Table, Tabled};
 
 use sqlx::{Error, PgPool};
 
-use crate::{db_connection::establish_connect, utils::send_email};
-use crate::utils::get_text_input;
+
 #[derive(Template)]
 #[template(path= "index.html")]
 struct BirthdayTemp<'a> {
     name: &'a str,
 }
+
 
 #[derive(Default, Tabled, Clone, Debug, Serialize)]
 pub struct Friend {
@@ -28,19 +30,12 @@ pub struct Friend {
     dob: NaiveDate,
 }
 
-// FriendError is enum type which is used to handle error
-pub enum FriendError {
-    FriendNotFound, // FriendNotFound is used when friend is not found in the database table
-                    // Ex: When we try to remove or get friend which is not in the list
-    FriendAlreadyExist, // FriendAlreadyExist is used when friend with provided email already exist in the database table
-    SqlxError(Error) // SqlxError is used when sqlx crate return error
-}
 
 impl Friend {
     // get_friend is used to get friend from the database table
     // It takes two argument
     // 1. conn: &PgPool (Postgres connection) >> It is used to connect with database
-    // 2. id: i32 >> It is used to get friend with provided id 
+    // 2. id: i32 >> It is used to get friend with provided id
     pub async fn get_friend(conn: &PgPool, id: i32) -> Result<Friend, FriendError> {
         let result = sqlx::query_as!(Friend, "SELECT * FROM friend WHERE id = ($1)", id)
             .fetch_one(conn)
@@ -56,6 +51,7 @@ impl Friend {
         }
     }
 
+    // get_friends is used to get all friends detail from the database table
     pub async fn get_friends(conn: &PgPool) -> Result<Vec<Friend>, Error> {
         let friends = sqlx::query_as!(Friend, "SELECT * FROM friend",)
             .fetch_all(conn)
@@ -63,6 +59,7 @@ impl Friend {
         friends
     }
 
+    // remove_friend is used to remove friend from the database table
     pub async fn remove_friend(self, conn: &PgPool) -> Result<Friend, FriendError> {
         let friend = sqlx::query_as!(
             Friend,
@@ -86,7 +83,7 @@ impl Friend {
         let subject = format!("Happy Birthday {}!",self.name);
         // let body = format!("Happy Birthday {}!", self.name);
         let body = BirthdayTemp{name: &self.name};
-        send_email((*self.email).to_string(), subject, body.render().unwrap()).await;
+        send_email(&self.email, subject, body.render().unwrap()).await.unwrap();
     }
 
     async fn get_friend_by_email(conn : &PgPool, email : &str) -> Result<Friend, Error>{

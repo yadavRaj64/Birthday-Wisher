@@ -1,2 +1,3 @@
 -- Add down migration script here
-DROP TABLE friend;
+DROP TABLE users;
+

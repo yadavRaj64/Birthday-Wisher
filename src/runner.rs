@@ -1,5 +1,4 @@
-use crate::schema::{BirthdayWisher, Friends, InputTypes};
-use crate::utils::{clear, get_text_input};
+use crate::{helper::utils::{clear, get_text_input}, schema::friend::{Friends, BirthdayWisher, InputTypes}};
 use inquire::Select;
 
 pub async fn send(){
